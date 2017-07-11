@@ -1,0 +1,8 @@
+RGAPI-ef4a41fb-c325-4274-b3f9-38f680140986
+23777784
+acct ID 37952182
+
+python -m pip install SomePackage
+
+Ranked 3v3 = 9
+Ranked 5v5 = 4
