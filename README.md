@@ -1,6 +1,8 @@
 # LoLDataComp
 A program to learn more about Riot's API, Python, Gui's, and SQlite3.
 
+Simply run the program and type in Summoner names in order to view their ranked data and games. More features to come for showing more stats and such.
+
 RIOT DISCLAIMER
 
 TERMINATION
