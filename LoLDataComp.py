@@ -7,7 +7,7 @@ from appJar import gui
 def main(): 
 
     # This is my Riot API Auth Key so that i can access their database
-    APIKey = "RGAPI-b6b4b44d-3145-45cf-816f-2218f20948b2"
+    APIKey = "RGAPI-8e10e191-fd09-40a3-8797-c334b9773dfb"
     # This will hold Summoner ID
     sum_ID = ""
     # This will hold Account ID
