@@ -2,12 +2,14 @@ import requests
 import sqlite3
 import os.path
 import time
+import tkinter
+import webbrowser
 from appJar import gui
    
 def main(): 
 
-    # This is my Riot API Auth Key so that i can access their database
-    APIKey = "RGAPI-3d8bba1d-4b1f-49a9-ba6f-45c333e91938"
+    # This is the Riot API Auth Key to access their servers
+    APIKey = ""
     # This will hold Summoner ID
     sum_ID = ""
     # This will hold Account ID
@@ -25,6 +27,7 @@ def main():
     # Returns a Dict named Champs for reference
     def requestChampData(rgn,APIKey):
         URL = "https://" + rgn + ".api.riotgames.com/lol/static-data/v3/champions?locale=en_US&tags=keys&dataById=true&api_key=" + APIKey
+        print(URL)
         conn = sqlite3.connect('Ranked_Data.db')
         c = conn.cursor()
         conn.execute('''CREATE TABLE IF NOT EXISTS CHAMPS
@@ -39,7 +42,7 @@ def main():
             champ_dict.update({id : name})
         conn.commit()
         conn.close()
-        return champ_dict
+        # return champ_dict
     
     # This grabs Summoner info from Riot Servers
     def requestSummonerData(rgn, sumName, APIKey): 
@@ -75,18 +78,19 @@ def main():
             query_Temp = 'SELECT GAMEID, CHAMP, TIME FROM {}'.format(sumName)
             c.execute(query_Temp)
             stuff = c.fetchall()
-            
-            showData.setGeometry("500x500")
-            showData.addScrolledTextArea("a1")
-            for k in range(len(stuff)-1,0,-1):
+            #showData.setGeometry("500x500")
+            #showData.addScrolledTextArea("a1")
+            showData.addGrid("g1", [["#","DATE PLAYED","GAME ID","CHAMP"]])
+            for k in range(0,len(stuff)-1):
                 champName = stuff[k][1]
                 query_Temp = "SELECT NAME FROM CHAMPS WHERE ID='{}'".format(champName)
                 c.execute(query_Temp)
                 champName = c.fetchone()[0]
                 day = time.strftime('%m/%d/%Y %H:%M', time.gmtime(stuff[k][2]/1000.0))
-                showData.setTextArea("a1","\n{})       {}        {}".format(day, stuff[k][0], champName))    
-            showData.setTextArea("a1","\n   DATE PLAYED             GAME ID              CHAMP")
-            showData.setTextArea("a1","Total games: {}".format(len(stuff)))
+                showData.addGridRow("g1",[len(stuff)-k+1,day,stuff[k][0],champName])
+                # showData.setTextArea("a1","\n{})       {}        {}".format(day, stuff[k][0], champName))    
+            # showData.setTextArea("a1","\n   DATE PLAYED             GAME ID              CHAMP")
+            # showData.setTextArea("a1","Total games: {}".format(len(stuff)))
             conn.close()
             showData.go()
                 
@@ -94,7 +98,6 @@ def main():
     def importRankedData(rgn, act_ID, APIKey, sumName):
         # Import all ranked data into database
         URL = "https://" + rgn + ".api.riotgames.com/lol/match/v3/matchlists/by-account/"+ act_ID + "?season=9&api_key=" + APIKey
-        print(URL)
         ranked_data = requests.get(URL)
         ranked_data = ranked_data.json()
         conn = sqlite3.connect('Ranked_Data.db')
@@ -145,18 +148,13 @@ def main():
         ranked.go()
         
             
-    def menu_Start(rgn, sum_ID, sumName, sum_lvl, act_ID):
+    def menu_Start(rgn, sum_ID, sumName, sum_lvl, act_ID, APIKey):
         def menu_buttons(button):
             if button == "Start":
                 # Grab the Action
                 user_Action = menu.getOptionBox("Actions")
-                # Determine which action to do now
-                if user_Action == "Lookup Rank":
-                    sum_Rank = requestSummonerRank(rgn,sum_ID,APIKey)
-                    # Create Gui with info
-                    ranked_Start(rgn, sum_ID, sumName, APIKey, sum_Rank)
-                    
-                elif user_Action == "View Ranked Data":
+                # Determine which action to do now   
+                if user_Action == "View Ranked Data":
                     error_msg = viewRankedData(rgn, sum_ID, APIKey, sumName)
                     if error_msg == "NO DATABASE":
                         menu.setLabel("Error","Database has not been created")
@@ -168,9 +166,6 @@ def main():
                     if error_msg == "Completed":
                         menu.setLabel("Error","Ranked Info Updated!")
                         menu.setLabelBg("Error","green")
-                    
-                    
-                
                 
             elif button == "Exit":
                 # Exit out of the entire program
@@ -178,7 +173,7 @@ def main():
             elif button == "Log Out":
                 # Return user to Login Screen
                 menu.stop() 
-                login_Start()
+                login_Start(APIKey)
                 
         
         # Making the Gui
@@ -188,8 +183,17 @@ def main():
         menu.addLabel("log-l1", "Summoner Name: "+sumName)
         menu.addLabel("log-l2", "Summoner ID: "+sum_ID)
         menu.addLabel("log-l3", "Summoner Lvl: "+sum_lvl)
+        # This pulls the Player's Ranks
+        sum_Rank = requestSummonerRank(rgn,sum_ID,APIKey)
+        if len(sum_Rank)==0:
+            menu.addLabel("woops","-- Not ranked yet --")
+        else:
+            for k in range(0,len(sum_Rank)):
+                sum_Rank_Out = sum_Rank.pop(0)
+                menu.addLabel("mesA"+(str)(k), sum_Rank_Out['queueType']+": "+sum_Rank_Out['tier']+" "+sum_Rank_Out['rank'])
+                menu.addLabel("mesB"+(str)(k), "   Wins: "+(str)(sum_Rank_Out['wins'])+"   Losses: "+(str)(sum_Rank_Out['losses'])+"\n")
         menu.addLabel("log-l4", "Choose an Action")
-        menu.addLabelOptionBox("Actions",["Lookup Rank", "View Ranked Data", "Import Ranked Data"]) 
+        menu.addLabelOptionBox("Actions",["View Ranked Data", "Import Ranked Data"]) 
         menu.addButtons(["Start", "Exit", "Log Out"], menu_buttons)
         menu.addLabel("Error")
         # Check if Table Exists prior to user asking
@@ -208,7 +212,7 @@ def main():
             
         
         
-    def login_Start():
+    def login_Start(APIKey):
         def login_buttons(button):
             if button == "Quit":
                 login.stop()  
@@ -232,26 +236,84 @@ def main():
                     sum_ID = str(responseJSON['id'])
                     act_ID = str(responseJSON['accountId'])
                     sum_lvl = str(responseJSON['summonerLevel'])
-                    # Champ Database will update every time you login to ensure it is up to date
-                    champ_dict = requestChampData(rgn, APIKey)
                     # As long as data is correct, go to next screen and close out this this one   
                     login.stop()
-                    menu_Start(rgn, sum_ID, sumName, sum_lvl, act_ID)
+                    menu_Start(rgn, sum_ID, sumName, sum_lvl, act_ID, APIKey)
+            elif button == "Update Champs":
+                rgn = (str) (login.getOptionBox("Region"))
+                requestChampData(rgn,APIKey)
+                login.setLabel("Error","Champ Dictionary Updated!")
+                login.setLabelBg("Error","blue")
+                conn = sqlite3.connect('Ranked_Data.db')
+                c = conn.cursor()
+                conn.execute('''CREATE TABLE IF NOT EXISTS CHAMPS
+                    (ID INT PRIMARY KEY     NOT NULL,
+                    NAME      STR     NOT NULL);''')
+                query_Temp = "SELECT NAME FROM CHAMPS WHERE ID=(SELECT MAX(ID) FROM CHAMPS)"
+                c.execute(query_Temp)
+                temp_champ = c.fetchone()
+                login.setLabel("Champ","Newest champ not {}? --->".format(temp_champ[0]))
+                conn.close()
+                
                 
         #Creating the Gui        
         login = gui("Summoner Retrieval")
         login.setPadding([20,2])
-        login.addLabel("title", "  Enter the Following to Login!  ")
-        login.addLabelOptionBox("Region", ["na1","euw1", "eun1", "oc1"])
-        login.addLabelEntry("Summoner Name")
-        login.addButtons(["Check", "Quit"], login_buttons)
+        login.addLabel("title", "  Enter the following to grab their data!  ",0,0,2)
+        login.addLabelOptionBox("Region", ["na1","euw1", "eun1", "oc1"],1,0,2)
+        login.addLabelEntry("Summoner Name",2,0,2)
+        login.addButtons(["Check", "Quit"], login_buttons,3,0,2)
         # This is here in case an error with login occurs
-        login.addEmptyLabel("Error")    
+        login.addEmptyLabel("Error",4,0,2)
+        # This checks if the Champ Data exists and if it is up to date
+        conn = sqlite3.connect('Ranked_Data.db')
+        c = conn.cursor()
+        conn.execute('''CREATE TABLE IF NOT EXISTS CHAMPS
+            (ID INT PRIMARY KEY     NOT NULL,
+            NAME      STR     NOT NULL);''')
+        query_Temp = "SELECT NAME FROM CHAMPS WHERE ID=(SELECT MAX(ID) FROM CHAMPS)"
+        c.execute(query_Temp)
+        temp_champ = c.fetchone()
+        login.addLabel("Champ","Newest champ not {}? --->".format(temp_champ[0]),5,0,1)
+        conn.close()
+        login.addButton("Update Champs",login_buttons,5,1,1)
+        
         login.go()  
 
 
-    # This starts the user at the login Screen
-    login_Start()
+    def APIKey_Entry():
+        def menu_button(button):
+            if button=="Get a Key":
+                webbrowser.open('https://developer.riotgames.com/')
+            elif button=="Check Key":
+                APIKey = (str) (menu.getEntry("Riot API Key"))
+                # This is simply checking is the APIKey can get a valid response from the servers
+                responseJSON = requestSummonerData("na1","gwendolem",APIKey)
+                if "status" in responseJSON:
+                    if responseJSON['status']['status_code'] == 403:
+                        menu.setLabel("Error","Please Update APIKey")
+                        menu.setLabelBg("Error","yellow")
+                    if responseJSON['status']['status_code'] == 500:
+                        menu.setLabel("Error","Error with Riot 's Servers")
+                        menu.setLabelBg("Error","Orange")
+                else:
+                    menu.stop()
+                    login_Start(APIKey)
+    
+        menu = gui("LoLDataComp")
+        menu.setPadding([20,2])
+        menu.addLabel("welcome","Welcome to the LoLDataComp program")
+        menu.addLabel("second","    You need a Riot API Key to use this program    ")
+        menu.addLabel("third","It pulls data directly from Riot's servers")
+        menu.addLabel("fourth","Refer to the README.txt file for instructions")
+        menu.addLabelEntry("Riot API Key")
+        menu.addButtons(["Check Key","Get a Key"],menu_button)
+        menu.go()
+        
+        
+        
+    # This starts the user at the API Entry Screen
+    APIKey_Entry()
     
         
         
